@@ -1,5 +1,6 @@
+'use strict'
 
-export default class {
+module.exports =  class {
   constructor(options) {
     this.init(options)
   }
