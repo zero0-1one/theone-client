@@ -112,7 +112,7 @@ module.exports = class {
       } else {
         let error = null
         let res = null
-        let options = await hooks.requestOpts()
+        let options = await hooks.requestOpts(hooksData)
         while (true) {
           [error, res] = await this.options.request(options)
           if (error) {
