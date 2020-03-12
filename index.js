@@ -25,7 +25,7 @@ let request = null
 const builtInRequests = {
   //需要再项目中 安装 request 模块
   'request': async function (opts) {
-    if (!request) request = request('request')
+    if (!request) request = require('request')
     request[method.toLowerCase()](url, options, (error, response, body) => {
       if (error) return void resolve([error, null])
       try {
