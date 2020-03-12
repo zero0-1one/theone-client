@@ -96,7 +96,7 @@ module.exports = class {
 
   async call(method, action, args = {}, header = {}, opts = {}) {
     let hooksData = { client: this, method, action, args, header, opts }
-    let hooks = this.options
+    let hooks = this.options.hooks
     if (opts.hooks) Object.assign({}, hooks, opts.hooks)
 
     await hooks.before(hooksData).catch(() => { })
