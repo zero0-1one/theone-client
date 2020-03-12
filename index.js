@@ -5,7 +5,7 @@ const defaultHooks = {
   //hook 函数必须都为 async 函数 或返回 Promise
   before: async () => { },
   after: async () => { },
-  requestOpts: async ({ client, method, args, header }) => {
+  requestOpts: async ({ client, method, action, args, header }) => {
     return {
       method,
       url: client.options.url + action,
