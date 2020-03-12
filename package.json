@@ -1,6 +1,6 @@
 {
   "name": "zo-theone-api",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "theone client",
   "main": "index.js",
   "scripts": {
