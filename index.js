@@ -26,13 +26,15 @@ const builtInRequests = {
   //需要再项目中 安装 request 模块
   'request': async function (opts) {
     if (!request) request = require('request')
-    request[method.toLowerCase()](url, options, (error, response, body) => {
-      if (error) return void resolve([error, null])
-      try {
-        response.data = JSON.parse(body)
-      } catch (e) {
-      }
-      resolve([null, response])
+    return new Promise(resolve => {
+      request(opts, (error, response, body) => {
+        if (error) return void resolve([error, null])
+        try {
+          response.data = JSON.parse(body)
+        } catch (e) {
+        }
+        resolve([null, response])
+      })
     })
   },
 
