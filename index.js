@@ -1,21 +1,22 @@
 'use strict'
 
-
 const defaultHooks = {
   //hook 函数必须都为 async 函数 或返回 Promise
   before: async () => { },
   after: async () => { },
-  requestOpts: async ({ client, method, action, args, header }) => {
+  requestOpts: async ({ client, method, action, args, opts }) => {
     let url = client.options.url + action
-    let headers = Object.assign({}, client.options.header, header)
+    let header = Object.assign({}, client.options.header, opts.header)
     if (client._builtInRequest == 'request') {
       if (method == 'GET') {
-        return { method, url, headers, qs: args }
+        return { method, url, headers: header, qs: args }
+      } else if (header['content-type'] == 'application/json') {
+        return { method, url, headers: header, body: JSON.stringify(args) }
       } else {
-        return { method, url, headers, form: args }
+        return { method, url, headers: header, form: args }
       }
     } else {
-      return { method, url, header: headers, data: args }
+      return { method, url, header, data: args }
     }
   },
   retry: async () => false,   //异常时候重试处理,  如果返回 true 则重试, 返回fasle 不重试
@@ -40,7 +41,8 @@ module.exports = class {
     switch (name) {
       case 'request':
         try {
-          this._request = require('request')
+          let request = require('request')
+          this._request = request.defaults({ jar: request.jar() })
         } catch (e) {
           throw new Error('需要安装 request 模块(npm install request)')
         }
@@ -108,9 +110,9 @@ module.exports = class {
     return Math.floor(Math.random() * (max - min + 1)) + min
   }
 
-  async call(method, action, args = {}, header = {}, opts = {}) {
+  async call(method, action, args = {}, opts = {}) {
     method = method.toUpperCase()
-    let hooksData = { client: this, method, action, args, header, opts }
+    let hooksData = { client: this, method, action, args, opts }
     let hooks = this.options.hooks
     if (opts.hooks) Object.assign({}, hooks, opts.hooks)
 
@@ -139,7 +141,7 @@ module.exports = class {
         }
         hooksData.error = error
         hooksData.res = res
-        hooksData.results = await hooks.results(hooksData).catch(() => { })
+        hooksData.results = await hooks.results(hooksData)
         return hooksData.results
       }
     } finally {
@@ -147,16 +149,16 @@ module.exports = class {
     }
   }
 
-  async get(action, args, opts) {
-    return this.call('GET', action, args, {
-      'content-type': 'application/json'
-    }, opts)
+  async get(action, args, opts = {}) {
+    let header = opts.header || {}
+    opts.header = Object.assign({ 'content-type': 'application/json' }, header)
+    return this.call('GET', action, args, opts)
   }
 
-  async post(action, args, opts) {
-    return this.call('POST', action, args, {
-      'content-type': 'application/json'
-    }, opts)
+  async post(action, args, opts = {}) {
+    let header = opts.header || {}
+    opts.header = Object.assign({ 'content-type': 'application/json' }, header)
+    return this.call('POST', action, args, opts)
   }
 }
 
