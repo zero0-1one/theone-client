@@ -6,73 +6,33 @@ const defaultHooks = {
   before: async () => { },
   after: async () => { },
   requestOpts: async ({ client, method, action, args, header }) => {
-    return {
+    let result = {
       method,
       url: client.options.url + action,
-      data: args,
       header: Object.assign({}, client.options.header, header)
     }
+    if (client._builtInRequest == 'request') {
+      if (method == 'GET') {
+        result.qs = args
+        // } else if (result.header['content-type'] == 'application/json') {
+        //   result.body = JSON.stringify(args)
+      } else {
+        result.form = args
+      }
+    } else {
+      result.data = args
+    }
+    return result
   },
   retry: async () => false,   //异常时候重试处理,  如果返回 true 则重试, 返回fasle 不重试
   results: async ({ error, res }) => { if (!error) return res }
 }
 
-
-
-let request = null
-//request: 必须是 async 函数, 返回值为 [error, res],  参数接受一个 obj 类型参数, 默认包含{ method,url,data,header}, 可通过 hooks.requestOpts 来定制自己需要的参数
-//正对国内市场 内置了一些 request 
-const builtInRequests = {
-  //需要再项目中 安装 request 模块
-  'request': async function (opts) {
-    if (!request) request = require('request')
-    return new Promise(resolve => {
-      request(opts, (error, response, body) => {
-        if (error) return void resolve([error, null])
-        try {
-          response.data = JSON.parse(body)
-        } catch (e) {
-        }
-        resolve([null, response])
-      })
-    })
-  },
-
-  'wxmp': async function (opts) {
-    return new Promise(resolve => {
-      wx.request({
-        ...opts,
-        success(res) {
-          resolve([null, res])
-        },
-        fail(error) {
-          resolve([error, null])
-        }
-      })
-    })
-  },
-
-  'uniapp': async function (opts) {
-    return uni.request(opts)
-  }
-}
-
 module.exports = class {
-  constructor(options) {
-    this.init(options)
-  }
-
-  init(options = {}) {
+  constructor(options = {}) {
     this.options = {}
     if (!options.request) throw '未指定request方法!'
-    if (typeof options.request == 'function') {
-      this.options.request = options.request
-    } else if (typeof options.request == 'string' && builtInRequests[options.request]) {
-      this.options.request = builtInRequests[options.request]
-    } else {
-      throw '指定的 request 错误'
-    }
-
+    this.setRequest(options.request)
     if (options.mock) {
       this.options.mock = options.mock
       this.options.mockTimeout = options.mockTimeout || [0, 0]
@@ -80,6 +40,64 @@ module.exports = class {
     this.options.url = options.url || ''
     this.options.hooks = Object.assign(defaultHooks, options.hooks || {})
     this.options.header = options.header || {}
+  }
+
+  getBuiltInRequest(name) {
+    switch (name) {
+      case 'request':
+        try {
+          this._request = require('request')
+        } catch (e) {
+          throw new Error('需要安装 request 模块(npm install request)')
+        }
+        return async (opts) => {
+          return new Promise(resolve => {
+            this._request(opts, (error, response, body) => {
+              if (error) return void resolve([error, null])
+              try {
+                response.data = JSON.parse(body)
+              } catch (e) {
+              }
+              resolve([null, response])
+            })
+          })
+        }
+      case 'wxmp':
+        return async (opts) => {
+          return new Promise(resolve => {
+            wx.request({
+              ...opts,
+              success(res) {
+                resolve([null, res])
+              },
+              fail(error) {
+                resolve([error, null])
+              }
+            })
+          })
+        }
+
+      case 'uniapp':
+        return async (opts) => {
+          return uni.request(opts)
+        }
+      default:
+        throw new Error('不存在内置request类型 :' + name)
+    }
+  }
+
+  //request: 必须是 async 函数, 返回值为 [error, res],  参数接受一个 obj 类型参数, 默认{ method,url,data,header}, 可通过 hooks.requestOpts 来定制自己需要的参数
+  //正对国内市场 内置了一些 request ,   
+  setRequest(request) {
+    if (typeof request == 'function') {
+      this.options.request = request
+      this._builtInRequest = undefined
+    } else if (typeof request == 'string') {
+      this.options.request = this.getBuiltInRequest(request)
+      this._builtInRequest = request
+    } else {
+      throw new Error('request 类型错误')
+    }
   }
 
   //登录后会根据 accountId 分配不同的 apiUrl 以实现负载均衡
@@ -97,6 +115,7 @@ module.exports = class {
   }
 
   async call(method, action, args = {}, header = {}, opts = {}) {
+    method = method.toUpperCase()
     let hooksData = { client: this, method, action, args, header, opts }
     let hooks = this.options.hooks
     if (opts.hooks) Object.assign({}, hooks, opts.hooks)
