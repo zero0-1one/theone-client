@@ -6,23 +6,17 @@ const defaultHooks = {
   before: async () => { },
   after: async () => { },
   requestOpts: async ({ client, method, action, args, header }) => {
-    let result = {
-      method,
-      url: client.options.url + action,
-      header: Object.assign({}, client.options.header, header)
-    }
+    let url = client.options.url + action
+    let headers = Object.assign({}, client.options.header, header)
     if (client._builtInRequest == 'request') {
       if (method == 'GET') {
-        result.qs = args
-        // } else if (result.header['content-type'] == 'application/json') {
-        //   result.body = JSON.stringify(args)
+        return { method, url, headers, qs: args }
       } else {
-        result.form = args
+        return { method, url, headers, form: args }
       }
     } else {
-      result.data = args
+      return { method, url, header: headers, data: args }
     }
-    return result
   },
   retry: async () => false,   //异常时候重试处理,  如果返回 true 则重试, 返回fasle 不重试
   results: async ({ error, res }) => { if (!error) return res }
