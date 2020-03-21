@@ -2,23 +2,29 @@
 
 const defaultHooks = {
   //hook 函数必须都为 async 函数 或返回 Promise
+  cache: async () => { },
   before: async () => { },
   after: async () => { },
   requestOpts: async ({ client, method, action, args, opts }) => {
     let url = client.options.url + action
     let header = Object.assign({}, client.options.header, opts.header)
+    let results = { method, url, timeout: opts.timeout }
     if (client._builtInRequest == 'request') {
+      results.headers = header
       if (method == 'GET') {
-        return { method, url, headers: header, qs: args }
+        results.qs = args
       } else if (header['content-type'] == 'application/json') {
-        return { method, url, headers: header, body: JSON.stringify(args) }
+        results.body = JSON.stringify(args)
       } else {
-        return { method, url, headers: header, form: args }
+        results.form = args
       }
     } else {
-      return { method, url, header, data: args }
+      results.header = header
+      results.data = args
     }
+    return results
   },
+
   retry: async () => false,   //异常时候重试处理,  如果返回 true 则重试, 返回fasle 不重试
   results: async ({ error, res }) => { if (!error) return res }
 }
@@ -110,13 +116,13 @@ module.exports = class {
     return Math.floor(Math.random() * (max - min + 1)) + min
   }
 
-  async call(method, action, args = {}, opts = {}) {
+  async call(method, action, args, opts = {}) {
+    args = args || {}
     method = method.toUpperCase()
     let hooksData = { client: this, method, action, args, opts }
     let hooks = this.options.hooks
     if (opts.hooks) Object.assign({}, hooks, opts.hooks)
-
-    await hooks.before(hooksData).catch(() => { })
+    await hooks.before(hooksData).catch(e => console.error(e))
     try {
       if (this.options.mock) {
         return new Promise((resolve, reject) => {
@@ -129,29 +135,35 @@ module.exports = class {
       } else {
         let error = null
         let res = null
-        let options = await hooks.requestOpts(hooksData)
+        let options = await hooks.requestOpts(hooksData).catch(e => console.error(e))
         while (true) {
           [error, res] = await this.options.request(options)
           if (error) {
             if (!opts.retry) break //opts 未指定 retry 为 true
-            let isRetry = await hooks.retry(hooksData).catch(() => { })
+            let isRetry = await hooks.retry(hooksData).catch(e => console.error(e))
             if (isRetry) continue
           }
           break
         }
         hooksData.error = error
         hooksData.res = res
-        hooksData.results = await hooks.results(hooksData)
+        hooksData.results = await hooks.results(hooksData).catch(e => console.error(e))
         return hooksData.results
       }
+    } catch (e) {
+      hooksData.error = error
+      hooksData.res = null
+      return await hooks.results(hooksData).catch(e => console.error(e))
     } finally {
-      await hooks.after(hooksData).catch(() => { })
+      await hooks.after(hooksData).catch(e => console.error(e))
     }
   }
 
   async get(action, args, opts = {}) {
     let header = opts.header || {}
     opts.header = Object.assign({ 'content-type': 'application/json' }, header)
+    let results = await this.options.hooks.cache({ action, args, opts }).catch(e => console.error(e))
+    if (results) return results
     return this.call('GET', action, args, opts)
   }
 
