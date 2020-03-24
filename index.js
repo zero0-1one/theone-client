@@ -29,18 +29,18 @@ const defaultHooks = {
   results: async ({ error, res }) => { if (!error) return res }
 }
 
-module.exports = class {
+module.exports = class TheoneClient {
   constructor(options = {}) {
     this.options = {}
     if (!options.request) throw '未指定request方法!'
     this.setRequest(options.request)
     if (options.mock) {
       this.options.mock = options.mock
-      this.options.mockTimeout = options.mockTimeout || [0, 0]
+      this.options.mockTimeout = options.mockTimeout ? options.mockTimeout.slice(0) : [0, 0]
     }
     this.options.url = options.url || ''
-    this.options.hooks = Object.assign(defaultHooks, options.hooks || {})
-    this.options.header = options.header || {}
+    this.options.hooks = Object.assign({}, defaultHooks, options.hooks)
+    this.options.header = Object.assign({}, options.header)
   }
 
   getBuiltInRequest(name) {
