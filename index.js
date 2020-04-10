@@ -1,10 +1,11 @@
+/* eslint-disable no-console */
 'use strict'
 
 const defaultHooks = {
   //hook 函数必须都为 async 函数 或返回 Promise
-  cache: async () => { },
-  before: async () => { },
-  after: async () => { },
+  cache: async () => {},
+  before: async () => {},
+  after: async () => {},
   requestOpts: async ({ client, method, action, args, opts }) => {
     let url = client.options.url + action
     let header = Object.assign({}, client.options.header, opts.header)
@@ -25,8 +26,10 @@ const defaultHooks = {
     return results
   },
 
-  retry: async () => false,   //异常时候重试处理,  如果返回 true 则重试, 返回fasle 不重试
-  results: async ({ error, res }) => { if (!error) return res }
+  retry: async () => false, //异常时候重试处理,  如果返回 true 则重试, 返回fasle 不重试
+  results: async ({ error, res }) => {
+    if (!error) return res
+  },
 }
 
 module.exports = class TheoneClient {
@@ -52,20 +55,19 @@ module.exports = class TheoneClient {
         } catch (e) {
           throw new Error('需要安装 request 模块(npm install request)')
         }
-        return async (opts) => {
+        return async opts => {
           return new Promise(resolve => {
             this._request(opts, (error, response, body) => {
               if (error) return void resolve([error, null])
               try {
                 response.data = JSON.parse(body)
-              } catch (e) {
-              }
+              } catch (e) {}
               resolve([null, response])
             })
           })
         }
       case 'wxmp':
-        return async (opts) => {
+        return async opts => {
           return new Promise(resolve => {
             wx.request({
               ...opts,
@@ -74,13 +76,13 @@ module.exports = class TheoneClient {
               },
               fail(error) {
                 resolve([error, null])
-              }
+              },
             })
           })
         }
 
       case 'uniapp':
-        return async (opts) => {
+        return async opts => {
           return uni.request(opts)
         }
       default:
@@ -89,7 +91,7 @@ module.exports = class TheoneClient {
   }
 
   //request: 必须是 async 函数, 返回值为 [error, res],  参数接受一个 obj 类型参数, 默认{ method,url,data,header}, 可通过 hooks.requestOpts 来定制自己需要的参数
-  //正对国内市场 内置了一些 request ,   
+  //正对国内市场 内置了一些 request ,
   setRequest(request) {
     if (typeof request == 'function') {
       this.options.request = request
@@ -125,7 +127,7 @@ module.exports = class TheoneClient {
     await hooks.before(hooksData).catch(e => console.error(e))
     try {
       if (this.options.mock) {
-        return new Promise((resolve, reject) => {
+        return new Promise(resolve => {
           let [min, max] = this.options.mockTimeout
           setTimeout(async () => {
             hooksData.res = { data: this.options.mock[method.toLowerCase()](action, args) }
@@ -137,7 +139,9 @@ module.exports = class TheoneClient {
         let res = null
         let options = await hooks.requestOpts(hooksData).catch(e => console.error(e))
         while (true) {
-          [error, res] = await this.options.request(options)
+          let rt = await this.options.request(options)
+          error = rt[0]
+          res = rt[1]
           if (error) {
             if (!opts.retry) break //opts 未指定 retry 为 true
             let isRetry = await hooks.retry(hooksData).catch(e => console.error(e))
@@ -151,7 +155,7 @@ module.exports = class TheoneClient {
         return hooksData.results
       }
     } catch (e) {
-      hooksData.error = error
+      hooksData.error = e
       hooksData.res = null
       return await hooks.results(hooksData).catch(e => console.error(e))
     } finally {
@@ -173,4 +177,3 @@ module.exports = class TheoneClient {
     return this.call('POST', action, args, opts)
   }
 }
-
