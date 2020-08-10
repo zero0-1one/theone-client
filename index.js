@@ -123,7 +123,7 @@ module.exports = class TheoneClient {
     method = method.toUpperCase()
     let hooksData = { client: this, method, action, args, opts }
     let hooks = this.options.hooks
-    if (opts.hooks) Object.assign({}, hooks, opts.hooks)
+    if (opts.hooks) hooks = Object.assign({}, hooks, opts.hooks)
     await hooks.before(hooksData).catch(e => console.error(e))
     try {
       if (this.options.mock) {
