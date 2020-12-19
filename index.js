@@ -164,6 +164,8 @@ module.exports = class TheoneClient {
   }
 
   async get(action, args, opts = {}) {
+    args = JSON.parse(JSON.stringify(args)) //拷贝一份
+    opts = JSON.parse(JSON.stringify(opts)) //拷贝一份
     let header = opts.header || {}
     opts.header = Object.assign({ 'content-type': 'application/json' }, header)
     let results = await this.options.hooks.cache({ action, args, opts }).catch(e => console.error(e))
@@ -172,6 +174,8 @@ module.exports = class TheoneClient {
   }
 
   async post(action, args, opts = {}) {
+    args = JSON.parse(JSON.stringify(args)) //拷贝一份
+    opts = JSON.parse(JSON.stringify(opts)) //拷贝一份
     let header = opts.header || {}
     opts.header = Object.assign({ 'content-type': 'application/json' }, header)
     return this.call('POST', action, args, opts)
